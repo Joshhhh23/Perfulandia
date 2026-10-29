@@ -1,0 +1,25 @@
+{
+  "realm": "perfulandia",
+  "enabled": true,
+  "displayName": "Perfulandia",
+  "clients": [
+    {
+      "clientId": "perfulandia-frontend",
+      "name": "Perfulandia Frontend",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:3000/*"],
+      "webOrigins": ["http://localhost:3000"],
+      "protocol": "openid-connect"
+    },
+    {
+      "clientId": "perfulandia-backend",
+      "enabled": true,
+      "bearerOnly": true,
+      "protocol": "openid-connect"
+    }
+  ],
+  "roles": {"realm": [{"name":"admin"},{"name":"user"}]}
+}

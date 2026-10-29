@@ -1,0 +1,6 @@
+.env
+**/.env
+backend/target/
+react-perfumelandia/node_modules/
+react-perfumelandia/build/
+*.log

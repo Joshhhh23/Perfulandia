@@ -1,0 +1,79 @@
+services:
+  rabbit1:
+    image: rabbitmq:3.13-management
+    hostname: rabbit1
+    environment:
+      RABBITMQ_NODENAME: rabbit@rabbit1
+      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:-perfulandia_cluster_cookie_change_me}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-perfulandia}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-perfulandia_dev_password}
+    ports: ["5672:5672", "15672:15672"]
+    volumes:
+      - rabbit1_data:/var/lib/rabbitmq
+      - ./infra/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+    networks: [perfulandia]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  rabbit2:
+    image: rabbitmq:3.13-management
+    hostname: rabbit2
+    environment:
+      RABBITMQ_NODENAME: rabbit@rabbit2
+      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:-perfulandia_cluster_cookie_change_me}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-perfulandia}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-perfulandia_dev_password}
+    volumes:
+      - rabbit2_data:/var/lib/rabbitmq
+      - ./infra/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+    networks: [perfulandia]
+    depends_on: {rabbit1: {condition: service_healthy}}
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-change_this_admin_password}
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+    ports: ["8081:8080"]
+    volumes: ["./infra/keycloak:/opt/keycloak/data/import:ro"]
+    networks: [perfulandia]
+  kong:
+    image: kong:3.7
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+    ports: ["8000:8000", "8001:8001"]
+    volumes: ["./infra/kong/kong.yml:/kong/kong.yml:ro"]
+    networks: [perfulandia]
+    depends_on: [backend]
+  backend:
+    build: ./backend
+    environment:
+      SERVER_PORT: 8080
+      JWT_SECRET: ${JWT_SECRET:?Crea .env con JWT_SECRET de al menos 32 caracteres aleatorios}
+      RABBITMQ_HOST: rabbit1
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-perfulandia}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-perfulandia_dev_password}
+      FRONTEND_ORIGIN: http://localhost:3000
+      SPRING_DATASOURCE_URL: jdbc:h2:file:/app/data/perfulandia_db;AUTO_SERVER=TRUE
+    ports: ["8080:8080"]
+    volumes: ["backend_data:/app/data"]
+    networks: [perfulandia]
+    depends_on: {rabbit1: {condition: service_healthy}}
+networks:
+  perfulandia:
+    driver: bridge
+volumes:
+  rabbit1_data:
+  rabbit2_data:
+  backend_data:
